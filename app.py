@@ -1,13 +1,6 @@
-from flask import Flask, render_template, url_for, redirect, session
-from flask import request, jsonify
-#from flask_cors import CORS
-from dotenv import load_dotenv
+from tinydb import TinyDB, Query
 import openai
-import os
-from urllib.request import Request, urlopen
-from urllib.parse import urlencode, quote_plus, unquote
 import xmltodict
-import json
 import requests
 from flask import Flask, render_template, request, jsonify, make_response
 from flask_jwt_extended import (
@@ -57,7 +50,7 @@ def oauth_api():
     user = UserData(user)
     UserModel().upsert_user(user)
 
-    resp = make_response(render_template('index.html'))
+    resp = make_response(render_template('address.html'))
     access_token = create_access_token(identity=user.id)
     refresh_token = create_refresh_token(identity=user.id)
     resp.set_cookie("logined", "true")
@@ -190,9 +183,6 @@ def address():
     return render_template('address.html')
 
 
-
-
-
 # 밥 카테고리
 @app.route('/rice')
 def rice():
@@ -265,17 +255,36 @@ def basket(recipe_id):
     return "Recipe not found."
 
 
+#주소 쇼퍼앱으로 전송
+@app.route('/send-in-address', methods=['GET','POST'])
+def send_in_address():
+    selectd_city = request.form['city']
+    selectd_county = request.form['county']
+    detail_address = request.form['detail_address']
+    data = {'city': selectd_city, 'county': selectd_county,'detail_address': detail_address}
+    shopper_app_url = 'http://127.0.0.1:5001/receive-address'
+    response = requests.post(shopper_app_url, json=data)
+    db = TinyDB('db.json')
+    db.insert(data)
+
+    if response.status_code == 200:
+        return render_template('index.html')
+    else:
+        return '오류', 500
+
+
+#재료 쇼퍼앱으로 전송
 @app.route('/send-ingredients', methods=['POST'])
 def send_ingredients():
     selected_ingredients = request.form.getlist('ingredients')
-
+    db = TinyDB('db.json')
     data = {'ingredients': selected_ingredients}
     shopper_app_url = 'http://127.0.0.1:5001/receive-ingredients'
-
+    db.insert(data)
     response = requests.post(shopper_app_url, json=data)
 
     if response.status_code == 200:
-        return "재료를 쇼퍼 앱으로 성공적으로 전송했습니다."
+        return render_template('waiting_page.html')
     else:
         return '재료 전송에 실패했습니다.', 500
 
